@@ -13,47 +13,48 @@ jobs:
 
       - name: Generate Project
         run: |
-          # 1. Find the Builder (amake.exe)
-          $amake = Get-ChildItem -Path base -Filter "amake.exe" -Recurse | Select-Object -ExpandProperty FullName -First 1
-          if (-not $amake) { throw "Critical: amake.exe not found!" }
-          echo "Found Builder: $amake"
-
-          # 2. Find the Script (make.js)
-          $makejs = Get-ChildItem -Path base -Filter "make.js" -Recurse | Select-Object -ExpandProperty FullName -First 1
-          if (-not $makejs) { throw "Critical: make.js not found!" }
-          echo "Found Script: $makejs"
-
-          # 3. Enter the Project Folder (paint)
+          # Go into the project folder
           cd paint
           
-          # 4. Run the build command
-          # We use the full paths to avoid any "file not found" errors
-          & $amake $makejs -g direct3d11
+          # Run the official build script located in the base folder
+          # We use cmd /c to run the .bat file properly
+          cmd /c "..\base\make.bat -g direct3d11"
+
+          # Debug: List generated files to verify success
+          echo "Listing generated files in paint/build:"
+          if (Test-Path "build") { Get-ChildItem build } else { echo "No build folder found!" }
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
       - name: Build
         run: |
-          # Find the generated Solution file (.sln)
+          # Find the generated Solution file anywhere in the repo
           $slnPath = Get-ChildItem -Path . -Filter "*.sln" -Recurse | Select-Object -ExpandProperty FullName -First 1
-          if (-not $slnPath) { throw "Solution file not found! Generation failed." }
+          
+          if (-not $slnPath) { 
+            echo "Critical: Solution file still not found. Listing all files:"
+            Get-ChildItem -Recurse
+            throw "Generation failed." 
+          }
+          
+          echo "Building Solution: $slnPath"
           msbuild $slnPath /p:Configuration=Release /p:Platform=x64
 
       - name: Prepare Artifact
         run: |
           mkdir out
-          # Find the compiled .exe (It might be named ArmorTools.exe or ArmorPaint.exe)
+          # Find the compiled .exe (ignoring the build tool itself)
           $exePath = Get-ChildItem -Path . -Filter "Armor*.exe" -Recurse | Where-Object { $_.Name -notlike "*amake*" } | Select-Object -ExpandProperty FullName -First 1
           
           if ($exePath) { 
              copy $exePath out\ArmorPaint.exe 
-             echo "Copied executable: $exePath"
+             echo "Success! Copied: $exePath"
           } else {
-             throw "Build finished but no .exe was found!"
+             throw "Build finished but no ArmorPaint.exe was found!"
           }
           
-          if (Test-Path "data") { xcopy /E /I data out\data }
+          if (Test-Path "paint\data") { xcopy /E /I paint\data out\data }
 
       - name: Upload App
         uses: actions/upload-artifact@v4
