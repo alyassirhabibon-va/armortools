@@ -16,7 +16,8 @@ jobs:
           node-version: 18
 
       - name: Generate Project
-        run: node make -g direct3d11
+        # We added .js here so Node can find the file correctly
+        run: node make.js -g direct3d11
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
