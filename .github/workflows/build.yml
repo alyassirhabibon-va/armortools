@@ -14,18 +14,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20 # Upgraded to version 20 for better module support
 
       - name: Generate Project
-        # This command looks for the make file in every folder to find it
+        # We use --input-type=module to fix the SyntaxError
         run: |
           $makePath = Get-ChildItem -Path . -Filter "make.js" -Recurse | Select-Object -ExpandProperty FullName -First 1
-          if ($makePath) {
-            node $makePath -g direct3d11
-          } else {
-            Write-Error "Could not find make.js anywhere in the repository!"
-            exit 1
-          }
+          $content = Get-Content $makePath -Raw
+          node --input-type=module -e "$content" -- -g direct3d11
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
