@@ -11,19 +11,23 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Generate Project
+        # We STOP using 'node' here. We find the included 'make.exe' tool instead.
         run: |
-          $makeFile = Get-ChildItem -Path . -Filter "make.js" -Recurse | Select-Object -First 1
-          if (-not $makeFile) { throw "make.js not found" }
-          $dir = $makeFile.DirectoryName
-          # Create a temp package.json to enable ES Modules (fixes the SyntaxError)
-          '{"type": "module"}' | Out-File -FilePath "$dir/package.json" -Encoding utf8
-          node "$($makeFile.FullName)" -g direct3d11
+          # Look for the dedicated build tool in the base folder
+          $makeTool = Get-ChildItem -Path base -Filter "make.exe" -Recurse | Select-Object -First 1
+          
+          if (-not $makeTool) {
+            echo "make.exe not found in base folder. Listing files for debugging:"
+            Get-ChildItem -Path base -Recurse
+            exit 1
+          }
+          
+          echo "Found build tool: $($makeTool.FullName)"
+          
+          # Go into the paint folder and run the tool from there
+          cd paint
+          & $makeTool.FullName -g direct3d11
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
@@ -37,7 +41,7 @@ jobs:
         run: |
           mkdir out
           $exePath = Get-ChildItem -Path . -Filter "ArmorTools.exe" -Recurse | Select-Object -ExpandProperty FullName -First 1
-          copy $exePath out\ArmorPaint.exe
+          if ($exePath) { copy $exePath out\ArmorPaint.exe }
           if (Test-Path "data") { xcopy /E /I data out\data }
 
       - name: Upload App
