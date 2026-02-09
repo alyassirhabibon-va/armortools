@@ -16,8 +16,8 @@ jobs:
           node-version: 18
 
       - name: Generate Project
-        # We added .js here so Node can find the file correctly
-        run: node make.js -g direct3d11
+        # We point to the paint folder where the new make.js lives
+        run: node paint/make.js -g direct3d11
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
