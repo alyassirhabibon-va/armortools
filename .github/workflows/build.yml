@@ -13,40 +13,31 @@ jobs:
 
       - name: Generate Project
         run: |
-          # Go into the project folder
           cd paint
-          
-          # Run the official build script located in the base folder
-          # We use cmd /c to run the .bat file properly
+          # This creates the visual studio files
           cmd /c "..\base\make.bat -g direct3d11"
-
-          # Debug: List generated files to verify success
-          echo "Listing generated files in paint/build:"
-          if (Test-Path "build") { Get-ChildItem build } else { echo "No build folder found!" }
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
       - name: Build
         run: |
-          # Find the generated Solution file anywhere in the repo
-          $slnPath = Get-ChildItem -Path . -Filter "*.sln" -Recurse | Select-Object -ExpandProperty FullName -First 1
+          # FIX: Target the .vcxproj file because .sln was not created
+          $projPath = Get-ChildItem -Path . -Filter "*.vcxproj" -Recurse | Select-Object -ExpandProperty FullName -First 1
           
-          if (-not $slnPath) { 
-            echo "Critical: Solution file still not found. Listing all files:"
-            Get-ChildItem -Recurse
-            throw "Generation failed." 
+          if (-not $projPath) { 
+            throw "Critical: .vcxproj file not found. Generation failed." 
           }
           
-          echo "Building Solution: $slnPath"
-          msbuild $slnPath /p:Configuration=Release /p:Platform=x64
+          echo "Building Project: $projPath"
+          msbuild $projPath /p:Configuration=Release /p:Platform=x64
 
       - name: Prepare Artifact
         run: |
           mkdir out
-          # Find the compiled .exe (ignoring the build tool itself)
-          $exePath = Get-ChildItem -Path . -Filter "Armor*.exe" -Recurse | Where-Object { $_.Name -notlike "*amake*" } | Select-Object -ExpandProperty FullName -First 1
           
+          # 1. Find and copy the Exe
+          $exePath = Get-ChildItem -Path . -Filter "Armor*.exe" -Recurse | Where-Object { $_.Name -notlike "*amake*" } | Select-Object -ExpandProperty FullName -First 1
           if ($exePath) { 
              copy $exePath out\ArmorPaint.exe 
              echo "Success! Copied: $exePath"
@@ -54,7 +45,14 @@ jobs:
              throw "Build finished but no ArmorPaint.exe was found!"
           }
           
-          if (Test-Path "paint\data") { xcopy /E /I paint\data out\data }
+          # 2. Copy the Data folder (Shaders/Assets)
+          # Your logs showed this is located in paint/build/out/data
+          if (Test-Path "paint\build\out\data") { 
+            echo "Copying data from paint\build\out\data..."
+            xcopy /E /I /Y paint\build\out\data out\data 
+          } else {
+            throw "Critical: Data folder not found!"
+          }
 
       - name: Upload App
         uses: actions/upload-artifact@v4
