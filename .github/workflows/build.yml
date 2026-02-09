@@ -14,14 +14,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20 # Upgraded to version 20 for better module support
+          node-version: 20
 
       - name: Generate Project
-        # We use --input-type=module to fix the SyntaxError
         run: |
-          $makePath = Get-ChildItem -Path . -Filter "make.js" -Recurse | Select-Object -ExpandProperty FullName -First 1
-          $content = Get-Content $makePath -Raw
-          node --input-type=module -e "$content" -- -g direct3d11
+          $makeFile = Get-ChildItem -Path . -Filter "make.js" -Recurse | Select-Object -First 1
+          if (-not $makeFile) { throw "make.js not found" }
+          $dir = $makeFile.DirectoryName
+          # Create a temp package.json to enable ES Modules (fixes the SyntaxError)
+          '{"type": "module"}' | Out-File -FilePath "$dir/package.json" -Encoding utf8
+          node "$($makeFile.FullName)" -g direct3d11
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
@@ -36,7 +38,7 @@ jobs:
           mkdir out
           $exePath = Get-ChildItem -Path . -Filter "ArmorTools.exe" -Recurse | Select-Object -ExpandProperty FullName -First 1
           copy $exePath out\ArmorPaint.exe
-          xcopy /E /I data out\data
+          if (Test-Path "data") { xcopy /E /I data out\data }
 
       - name: Upload App
         uses: actions/upload-artifact@v4
